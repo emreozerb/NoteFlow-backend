@@ -66,6 +66,14 @@ public class UserController {
         }
     }
 
+    // Get all users
+    @GetMapping
+    public ResponseEntity<List<User>> getAllUsers() {
+        List<User> users = userService.getAllUsers();
+        // users.forEach(user -> user.setPassword(null)); // Don't return passwords
+        return ResponseEntity.ok(users);
+    }
+
     // Update user profile
     @PutMapping("/{id}")
     public ResponseEntity<?> updateUser(@PathVariable Long id, @Valid @RequestBody UserUpdateRequest request) {
