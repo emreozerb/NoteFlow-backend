@@ -27,6 +27,7 @@ public class Note {
     @Size(max = 200, message = "Title cannot exceed 200 characters")
     private String title;
 
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     @ManyToOne(fetch = FetchType.LAZY)
