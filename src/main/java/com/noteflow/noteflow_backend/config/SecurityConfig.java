@@ -28,12 +28,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.security.NoSuchAlgorithmException;
 import java.util.List;
 
 @Configuration
@@ -49,16 +47,29 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecretKey secretKey(JwtProperties jwtProperties) throws NoSuchAlgorithmException {
-        final var secretKeyProperty = jwtProperties.secretKey();
-        if (secretKeyProperty == null || secretKeyProperty.isEmpty()) {
-            log.warn("No secret key configured, generating a random key");
-            final var secretKeyGenerator = KeyGenerator.getInstance("AES");
-            return secretKeyGenerator.generateKey();
-        } else {
-            final var bytes = secretKeyProperty.getBytes(StandardCharsets.UTF_8);
-            return new SecretKeySpec(bytes, "AES");
+    public SecretKey secretKey(JwtProperties jwtProperties) {
+        String keyString = jwtProperties.secretKey();
+
+        if (keyString == null || keyString.isEmpty()) {
+            throw new IllegalStateException(
+                    "JWT secret key must be configured in application.properties: jwt.secret-key");
         }
+
+        if (keyString.length() < 32) {
+            throw new IllegalArgumentException(
+                    "JWT secret key must be at least 32 characters (256 bits). Current length: " + keyString.length());
+        }
+
+        log.info("JWT secret key configured successfully");
+
+        // Convert to bytes
+        byte[] keyBytes = keyString.getBytes(StandardCharsets.UTF_8);
+
+        // HS256 requires exactly 32 bytes (256 bits)
+        byte[] key32 = new byte[32];
+        System.arraycopy(keyBytes, 0, key32, 0, Math.min(keyBytes.length, 32));
+
+        return new SecretKeySpec(key32, "HmacSHA256");
     }
 
     @Bean
@@ -70,11 +81,13 @@ public class SecurityConfig {
 
     @Bean
     public JwtEncoder jwtEncoder(SecretKey secretKey) {
-        final JWK jwk = new OctetSequenceKey.Builder(secretKey)
+        JWK jwk = new OctetSequenceKey.Builder(secretKey)
+                .keyID("noteflow-key-1")
                 .algorithm(JWSAlgorithm.HS256)
                 .build();
-        final var jwks = new ImmutableJWKSet<>(new JWKSet(jwk));
-        return new NimbusJwtEncoder(jwks);
+
+        JWKSet jwkSet = new JWKSet(jwk);
+        return new NimbusJwtEncoder(new ImmutableJWKSet<>(jwkSet));
     }
 
     @Bean

@@ -2,6 +2,7 @@ package com.noteflow.noteflow_backend.security;
 
 import com.noteflow.noteflow_backend.config.JwtProperties;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Component;
 
@@ -33,7 +34,10 @@ public class JwtUtil {
                 .claim("userId", userId)
                 .build();
 
-        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        // ✅ IMPORTANT: Specify the algorithm in the header
+        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+
+        return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 
     public String extractEmail(String token) {
