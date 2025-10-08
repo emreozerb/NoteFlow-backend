@@ -1,13 +1,15 @@
 package com.noteflow.noteflow_backend.controller;
 
 import com.noteflow.noteflow_backend.model.Category;
+import com.noteflow.noteflow_backend.model.User;
 import com.noteflow.noteflow_backend.service.CategoryService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -18,47 +20,69 @@ public class CategoryController {
     @Autowired
     private CategoryService categoryService;
 
-    // Create new category
-    @PostMapping("/user/{userId}")
-    public ResponseEntity<?> createCategory(@PathVariable Long userId, @Valid @RequestBody Category category) {
-        try {
-            Category createdCategory = categoryService.createCategory(userId, category);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdCategory);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
-    }
-
-    // Get all categories for user
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getCategoriesByUser(@PathVariable Long userId) {
-        try {
-            List<Category> categories = categoryService.getCategoriesByUserId(userId);
-            return ResponseEntity.ok(categories);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
-    }
-
-    // Get all categories (admin only)
     @GetMapping
-    public ResponseEntity<?> getAllCategories() {
+    public ResponseEntity<List<Category>> getAllCategories(Authentication authentication) {
+        User user = (User) authentication.getPrincipal();
+        List<Category> categories = categoryService.getCategoriesByUser(user);
+        return ResponseEntity.ok(categories);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getCategoryById(@PathVariable Long id, Authentication authentication) {
         try {
-            List<Category> categories = categoryService.getAllCategories();
-            return ResponseEntity.ok(categories);
+            User user = (User) authentication.getPrincipal();
+            Category category = categoryService.getCategoryById(id, user);
+            return ResponseEntity.ok(category);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+    @PostMapping
+    public ResponseEntity<?> createCategory(@Valid @RequestBody CreateCategoryRequest request,
+            Authentication authentication) {
+        try {
+            User user = (User) authentication.getPrincipal();
+            Category category = categoryService.createCategory(request.getName(), user);
+            return ResponseEntity.status(HttpStatus.CREATED).body(category);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
 
-    // Delete category
-    @DeleteMapping("/{id}/user/{userId}")
-    public ResponseEntity<?> deleteCategory(@PathVariable Long id, @PathVariable Long userId) {
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateCategory(@PathVariable Long id,
+            @Valid @RequestBody CreateCategoryRequest request,
+            Authentication authentication) {
         try {
-            categoryService.deleteCategory(id, userId);
+            User user = (User) authentication.getPrincipal();
+            Category category = categoryService.updateCategory(id, request.getName(), user);
+            return ResponseEntity.ok(category);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteCategory(@PathVariable Long id, Authentication authentication) {
+        try {
+            User user = (User) authentication.getPrincipal();
+            categoryService.deleteCategory(id, user);
             return ResponseEntity.ok("Category deleted successfully");
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    public static class CreateCategoryRequest {
+        private String name;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
         }
     }
 }

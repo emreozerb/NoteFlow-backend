@@ -3,13 +3,11 @@ package com.noteflow.noteflow_backend.service;
 import com.noteflow.noteflow_backend.model.Category;
 import com.noteflow.noteflow_backend.model.User;
 import com.noteflow.noteflow_backend.repository.CategoryRepository;
-import com.noteflow.noteflow_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @Transactional
@@ -18,42 +16,55 @@ public class CategoryService {
     @Autowired
     private CategoryRepository categoryRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    public List<Category> getCategoriesByUser(User user) {
+        return categoryRepository.findByUser(user);
+    }
 
-    // Create new category
-    public Category createCategory(Long userId, Category category) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public Category getCategoryById(Long id, User user) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Category not found"));
 
-        // Check if category name already exists for this user
-        if (categoryRepository.existsByNameAndUser(category.getName(), user)) {
-            throw new RuntimeException("Category name already exists for this user");
+        if (!category.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Unauthorized access to category");
         }
 
+        return category;
+    }
+
+    public Category createCategory(String name, User user) {
+        // Check if category name already exists for this user
+        List<Category> existingCategories = categoryRepository.findByUser(user);
+        boolean nameExists = existingCategories.stream()
+                .anyMatch(cat -> cat.getName().equalsIgnoreCase(name));
+
+        if (nameExists) {
+            throw new RuntimeException("Category name already exists");
+        }
+
+        Category category = new Category();
+        category.setName(name);
         category.setUser(user);
         return categoryRepository.save(category);
     }
 
-    public List<Category> getCategoriesByUserId(Long userId) {
-        return categoryRepository.findByUser_IdOrderByCreatedAtDesc(userId);
-    }
+    public Category updateCategory(Long id, String name, User user) {
+        Category category = getCategoryById(id, user);
 
-    public List<Category> getAllCategories() {
-        return categoryRepository.findAll();
-    }
+        // Check if new name already exists for this user (excluding current category)
+        List<Category> existingCategories = categoryRepository.findByUser(user);
+        boolean nameExists = existingCategories.stream()
+                .anyMatch(cat -> !cat.getId().equals(id) && cat.getName().equalsIgnoreCase(name));
 
-    // Delete category
-    public void deleteCategory(Long id, Long userId) {
-        Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found"));
-
-        // Check user ownership
-        if (!category.getUser().getId().equals(userId)) {
-            throw new RuntimeException("Access denied: Category belongs to different user");
+        if (nameExists) {
+            throw new RuntimeException("Category name already exists");
         }
 
-        categoryRepository.deleteById(id);
+        category.setName(name);
+        return categoryRepository.save(category);
     }
 
+    public void deleteCategory(Long id, User user) {
+        Category category = getCategoryById(id, user);
+        categoryRepository.delete(category);
+    }
 }

@@ -1,16 +1,15 @@
 package com.noteflow.noteflow_backend.service;
 
-import com.noteflow.noteflow_backend.model.Note;
 import com.noteflow.noteflow_backend.model.Folder;
-import com.noteflow.noteflow_backend.repository.NoteRepository;
+import com.noteflow.noteflow_backend.model.Note;
+import com.noteflow.noteflow_backend.model.User;
 import com.noteflow.noteflow_backend.repository.FolderRepository;
+import com.noteflow.noteflow_backend.repository.NoteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @Transactional
@@ -22,92 +21,88 @@ public class NoteService {
     @Autowired
     private FolderRepository folderRepository;
 
-    // Create new note
-    public Note createNote(Long folderId, Long userId, Note note) {
+    public List<Note> getNotesByUser(User user) {
+        return noteRepository.findByFolderCategoryUser(user);
+    }
+
+    public List<Note> getNotesByFolder(Long folderId, User user) {
         Folder folder = folderRepository.findById(folderId)
                 .orElseThrow(() -> new RuntimeException("Folder not found"));
 
-        // Check user ownership of folder
-        if (!folder.getCategory().getUser().getId().equals(userId)) {
-            throw new RuntimeException("Access denied: Folder belongs to different user");
+        if (!folder.getCategory().getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Unauthorized access to folder");
         }
 
-        note.setFolder(folder);
-        return noteRepository.save(note);
+        return noteRepository.findByFolder(folder);
     }
 
-    // Get note by ID (with user validation)
-    public Optional<Note> getNoteById(Long id, Long userId) {
-        Optional<Note> note = noteRepository.findById(id);
+    public Note getNoteById(Long noteId, User user) {
+        Note note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new RuntimeException("Note not found"));
 
-        if (note.isPresent() && !note.get().getFolder().getCategory().getUser().getId().equals(userId)) {
-            throw new RuntimeException("Access denied: Note belongs to different user");
+        if (!note.getFolder().getCategory().getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Unauthorized access to note");
         }
 
         return note;
     }
 
-    // Get all notes for user
-    public List<Note> getNotesByUser(Long userId) {
-        return noteRepository.findByUserId(userId);
-    }
+    public Note createNote(String title, String content, Long folderId, User user) {
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new RuntimeException("Folder not found"));
 
-    // Search notes for user
-    public List<Note> searchNotes(Long userId, String searchTerm) {
-        return noteRepository.searchNotesByUser(userId, searchTerm);
-    }
-
-    // Update note
-    public Note updateNote(Long id, Long userId, Note updatedNote) {
-        Note note = noteRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Note not found"));
-
-        // Check user ownership
-        if (!note.getFolder().getCategory().getUser().getId().equals(userId)) {
-            throw new RuntimeException("Access denied: Note belongs to different user");
+        if (!folder.getCategory().getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Unauthorized access to folder");
         }
 
-        note.setTitle(updatedNote.getTitle());
-        note.setContent(updatedNote.getContent());
+        Note note = new Note();
+        note.setTitle(title);
+        note.setContent(content);
+        note.setFolder(folder);
+
         return noteRepository.save(note);
     }
 
-    // Move note to different folder
-    public Note moveNote(Long noteId, Long newFolderId, Long userId) {
-        Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note not found"));
+    public Note updateNote(Long noteId, String title, String content, User user) {
+        Note note = getNoteById(noteId, user);
+        note.setTitle(title);
+        note.setContent(content);
+        return noteRepository.save(note);
+    }
+
+    public void deleteNote(Long noteId, User user) {
+        Note note = getNoteById(noteId, user);
+        noteRepository.delete(note);
+    }
+
+    // Additional useful methods
+    public Note moveNote(Long noteId, Long newFolderId, User user) {
+        Note note = getNoteById(noteId, user);
 
         Folder newFolder = folderRepository.findById(newFolderId)
                 .orElseThrow(() -> new RuntimeException("Target folder not found"));
 
-        // Check user ownership of both note and target folder
-        if (!note.getFolder().getCategory().getUser().getId().equals(userId)) {
-            throw new RuntimeException("Access denied: Note belongs to different user");
-        }
-
-        if (!newFolder.getCategory().getUser().getId().equals(userId)) {
-            throw new RuntimeException("Access denied: Target folder belongs to different user");
+        if (!newFolder.getCategory().getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Unauthorized access to target folder");
         }
 
         note.setFolder(newFolder);
         return noteRepository.save(note);
     }
 
-    // Delete note
-    public void deleteNote(Long id, Long userId) {
-        Note note = noteRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Note not found"));
+    public List<Note> searchNotes(User user, String searchTerm) {
+        // You'll need to add this method to NoteRepository
+        // For now, get all notes and filter in memory (not optimal for production)
+        List<Note> allNotes = getNotesByUser(user);
+        String lowerSearch = searchTerm.toLowerCase();
 
-        // Check user ownership
-        if (!note.getFolder().getCategory().getUser().getId().equals(userId)) {
-            throw new RuntimeException("Access denied: Note belongs to different user");
-        }
-
-        noteRepository.deleteById(id);
+        return allNotes.stream()
+                .filter(note -> note.getTitle().toLowerCase().contains(lowerSearch) ||
+                        (note.getContent() != null && note.getContent().toLowerCase().contains(lowerSearch)))
+                .toList();
     }
 
-    // Count notes for user
-    public long countNotesByUser(Long userId) {
-        return noteRepository.countByUserId(userId);
+    public long countNotesByUser(User user) {
+        return getNotesByUser(user).size();
     }
 }
