@@ -1,5 +1,9 @@
 package com.noteflow.noteflow_backend.controller;
 
+import com.noteflow.noteflow_backend.dto.request.folder.CreateFolderRequestDTO;
+import com.noteflow.noteflow_backend.dto.request.folder.UpdateFolderRequestDTO;
+import com.noteflow.noteflow_backend.dto.response.FolderDTO;
+import com.noteflow.noteflow_backend.mapper.FolderMapper;
 import com.noteflow.noteflow_backend.model.Folder;
 import com.noteflow.noteflow_backend.model.User;
 import com.noteflow.noteflow_backend.service.FolderService;
@@ -20,11 +24,15 @@ public class FolderController {
     @Autowired
     private FolderService folderService;
 
+    @Autowired
+    private FolderMapper folderMapper;
+
     @GetMapping
-    public ResponseEntity<List<Folder>> getAllFolders(Authentication authentication) {
+    public ResponseEntity<List<FolderDTO>> getAllFolders(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         List<Folder> folders = folderService.getFoldersByUser(user);
-        return ResponseEntity.ok(folders);
+        List<FolderDTO> folderDTOs = folderMapper.toDTOList(folders);
+        return ResponseEntity.ok(folderDTOs);
     }
 
     @GetMapping("/{id}")
@@ -32,7 +40,8 @@ public class FolderController {
         try {
             User user = (User) authentication.getPrincipal();
             Folder folder = folderService.getFolderById(id, user);
-            return ResponseEntity.ok(folder);
+            FolderDTO folderDTO = folderMapper.toDTO(folder);
+            return ResponseEntity.ok(folderDTO);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
@@ -44,14 +53,15 @@ public class FolderController {
         try {
             User user = (User) authentication.getPrincipal();
             List<Folder> folders = folderService.getFoldersByCategory(categoryId, user);
-            return ResponseEntity.ok(folders);
+            List<FolderDTO> folderDTOs = folderMapper.toDTOList(folders);
+            return ResponseEntity.ok(folderDTOs);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
 
     @PostMapping
-    public ResponseEntity<?> createFolder(@Valid @RequestBody CreateFolderRequest request,
+    public ResponseEntity<?> createFolder(@Valid @RequestBody CreateFolderRequestDTO request,
             Authentication authentication) {
         try {
             User user = (User) authentication.getPrincipal();
@@ -60,7 +70,8 @@ public class FolderController {
                     request.getDescription(),
                     request.getCategoryId(),
                     user);
-            return ResponseEntity.status(HttpStatus.CREATED).body(folder);
+            FolderDTO folderDTO = folderMapper.toDTO(folder);
+            return ResponseEntity.status(HttpStatus.CREATED).body(folderDTO);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -68,7 +79,7 @@ public class FolderController {
 
     @PutMapping("/{id}")
     public ResponseEntity<?> updateFolder(@PathVariable Long id,
-            @Valid @RequestBody UpdateFolderRequest request,
+            @Valid @RequestBody UpdateFolderRequestDTO request,
             Authentication authentication) {
         try {
             User user = (User) authentication.getPrincipal();
@@ -77,7 +88,8 @@ public class FolderController {
                     request.getName(),
                     request.getDescription(),
                     user);
-            return ResponseEntity.ok(folder);
+            FolderDTO folderDTO = folderMapper.toDTO(folder);
+            return ResponseEntity.ok(folderDTO);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -94,55 +106,4 @@ public class FolderController {
         }
     }
 
-    // Request DTOs
-    public static class CreateFolderRequest {
-        private String name;
-        private String description;
-        private Long categoryId;
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public void setDescription(String description) {
-            this.description = description;
-        }
-
-        public Long getCategoryId() {
-            return categoryId;
-        }
-
-        public void setCategoryId(Long categoryId) {
-            this.categoryId = categoryId;
-        }
-    }
-
-    public static class UpdateFolderRequest {
-        private String name;
-        private String description;
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public void setDescription(String description) {
-            this.description = description;
-        }
-    }
 }

@@ -1,5 +1,9 @@
 package com.noteflow.noteflow_backend.controller;
 
+import com.noteflow.noteflow_backend.dto.request.note.CreateNoteRequestDTO;
+import com.noteflow.noteflow_backend.dto.request.note.UpdateNoteRequestDTO;
+import com.noteflow.noteflow_backend.dto.response.NoteDTO;
+import com.noteflow.noteflow_backend.mapper.NoteMapper;
 import com.noteflow.noteflow_backend.model.Note;
 import com.noteflow.noteflow_backend.model.User;
 import com.noteflow.noteflow_backend.service.NoteService;
@@ -20,11 +24,15 @@ public class NoteController {
     @Autowired
     private NoteService noteService;
 
+    @Autowired
+    private NoteMapper noteMapper;
+
     @GetMapping
-    public ResponseEntity<List<Note>> getAllNotes(Authentication authentication) {
+    public ResponseEntity<List<NoteDTO>> getAllNotes(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         List<Note> notes = noteService.getNotesByUser(user);
-        return ResponseEntity.ok(notes);
+        List<NoteDTO> noteDTOs = noteMapper.toDTOList(notes);
+        return ResponseEntity.ok(noteDTOs);
     }
 
     @GetMapping("/{noteId}")
@@ -32,7 +40,8 @@ public class NoteController {
         try {
             User user = (User) authentication.getPrincipal();
             Note note = noteService.getNoteById(noteId, user);
-            return ResponseEntity.ok(note);
+            NoteDTO noteDTO = noteMapper.toDTO(note);
+            return ResponseEntity.ok(noteDTO);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
@@ -44,7 +53,8 @@ public class NoteController {
         try {
             User user = (User) authentication.getPrincipal();
             List<Note> notes = noteService.getNotesByFolder(folderId, user);
-            return ResponseEntity.ok(notes);
+            List<NoteDTO> noteDTOs = noteMapper.toDTOList(notes);
+            return ResponseEntity.ok(noteDTOs);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -55,14 +65,15 @@ public class NoteController {
         try {
             User user = (User) authentication.getPrincipal();
             List<Note> notes = noteService.searchNotes(user, q);
-            return ResponseEntity.ok(notes);
+            List<NoteDTO> noteDTOs = noteMapper.toDTOList(notes);
+            return ResponseEntity.ok(noteDTOs);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
 
     @PostMapping
-    public ResponseEntity<?> createNote(@Valid @RequestBody CreateNoteRequest request,
+    public ResponseEntity<?> createNote(@Valid @RequestBody CreateNoteRequestDTO request,
             Authentication authentication) {
         try {
             User user = (User) authentication.getPrincipal();
@@ -71,7 +82,8 @@ public class NoteController {
                     request.getContent(),
                     request.getFolderId(),
                     user);
-            return ResponseEntity.status(HttpStatus.CREATED).body(note);
+            NoteDTO noteDTO = noteMapper.toDTO(note);
+            return ResponseEntity.status(HttpStatus.CREATED).body(noteDTO);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -79,7 +91,7 @@ public class NoteController {
 
     @PutMapping("/{noteId}")
     public ResponseEntity<?> updateNote(@PathVariable Long noteId,
-            @Valid @RequestBody UpdateNoteRequest request,
+            @Valid @RequestBody UpdateNoteRequestDTO request,
             Authentication authentication) {
         try {
             User user = (User) authentication.getPrincipal();
@@ -88,7 +100,8 @@ public class NoteController {
                     request.getTitle(),
                     request.getContent(),
                     user);
-            return ResponseEntity.ok(note);
+            NoteDTO noteDTO = noteMapper.toDTO(note);
+            return ResponseEntity.ok(noteDTO);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -101,7 +114,8 @@ public class NoteController {
         try {
             User user = (User) authentication.getPrincipal();
             Note note = noteService.moveNote(noteId, folderId, user);
-            return ResponseEntity.ok(note);
+            NoteDTO noteDTO = noteMapper.toDTO(note);
+            return ResponseEntity.ok(noteDTO);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -129,55 +143,4 @@ public class NoteController {
         }
     }
 
-    // Request DTOs
-    public static class CreateNoteRequest {
-        private String title;
-        private String content;
-        private Long folderId;
-
-        public String getTitle() {
-            return title;
-        }
-
-        public void setTitle(String title) {
-            this.title = title;
-        }
-
-        public String getContent() {
-            return content;
-        }
-
-        public void setContent(String content) {
-            this.content = content;
-        }
-
-        public Long getFolderId() {
-            return folderId;
-        }
-
-        public void setFolderId(Long folderId) {
-            this.folderId = folderId;
-        }
-    }
-
-    public static class UpdateNoteRequest {
-        private String title;
-        private String content;
-
-        public String getTitle() {
-            return title;
-        }
-
-        public void setTitle(String title) {
-            this.title = title;
-        }
-
-        public String getContent() {
-            return content;
-        }
-
-        public void setContent(String content) {
-            this.content = content;
-        }
-    }
 }

@@ -10,6 +10,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import com.noteflow.noteflow_backend.dto.request.category.CreateCategoryRequestDTO;
+import com.noteflow.noteflow_backend.dto.response.CategoryDTO;
+import com.noteflow.noteflow_backend.mapper.CategoryMapper;
+
 import java.util.List;
 
 @RestController
@@ -20,69 +24,47 @@ public class CategoryController {
     @Autowired
     private CategoryService categoryService;
 
+    @Autowired
+    private CategoryMapper categoryMapper;
+
     @GetMapping
-    public ResponseEntity<List<Category>> getAllCategories(Authentication authentication) {
+    public ResponseEntity<List<CategoryDTO>> getAllCategories(Authentication authentication) {
         User user = (User) authentication.getPrincipal();
         List<Category> categories = categoryService.getCategoriesByUser(user);
-        return ResponseEntity.ok(categories);
+        List<CategoryDTO> categoryDTOs = categoryMapper.toDTOList(categories);
+        return ResponseEntity.ok(categoryDTOs);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getCategoryById(@PathVariable Long id, Authentication authentication) {
-        try {
-            User user = (User) authentication.getPrincipal();
-            Category category = categoryService.getCategoryById(id, user);
-            return ResponseEntity.ok(category);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+        User user = (User) authentication.getPrincipal();
+        Category category = categoryService.getCategoryById(id, user);
+        CategoryDTO categoryDTO = categoryMapper.toDTO(category);
+        return ResponseEntity.ok(categoryDTO);
     }
 
     @PostMapping
-    public ResponseEntity<?> createCategory(@Valid @RequestBody CreateCategoryRequest request,
+    public ResponseEntity<?> createCategory(@Valid @RequestBody CreateCategoryRequestDTO request,
             Authentication authentication) {
-        try {
-            User user = (User) authentication.getPrincipal();
-            Category category = categoryService.createCategory(request.getName(), user);
-            return ResponseEntity.status(HttpStatus.CREATED).body(category);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
+        User user = (User) authentication.getPrincipal();
+        Category category = categoryService.createCategory(request.getName(), user);
+        return ResponseEntity.status(HttpStatus.CREATED).body(category);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<?> updateCategory(@PathVariable Long id,
-            @Valid @RequestBody CreateCategoryRequest request,
+            @Valid @RequestBody CreateCategoryRequestDTO request,
             Authentication authentication) {
-        try {
-            User user = (User) authentication.getPrincipal();
-            Category category = categoryService.updateCategory(id, request.getName(), user);
-            return ResponseEntity.ok(category);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
+        User user = (User) authentication.getPrincipal();
+        Category category = categoryService.updateCategory(id, request.getName(), user);
+        return ResponseEntity.ok(category);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCategory(@PathVariable Long id, Authentication authentication) {
-        try {
-            User user = (User) authentication.getPrincipal();
-            categoryService.deleteCategory(id, user);
-            return ResponseEntity.ok("Category deleted successfully");
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
+        User user = (User) authentication.getPrincipal();
+        categoryService.deleteCategory(id, user);
+        return ResponseEntity.ok("Category deleted successfully");
     }
 
-    public static class CreateCategoryRequest {
-        private String name;
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-    }
-}
+};

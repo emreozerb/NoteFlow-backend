@@ -22,20 +22,12 @@ public class UserService {
 
     // Create new user (registration)
     public User createUser(User user) {
-        // Check if email already exists
-        if (userRepository.existsByEmail(user.getEmail())) {
-            throw new RuntimeException("Email already exists");
-        }
-
-        // Check if username already exists
-        if (userRepository.existsByUsername(user.getUsername())) {
-            throw new RuntimeException("Username already exists");
-        }
-
-        // Encode password
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-
         return userRepository.save(user);
+    }
+
+    public boolean validatePassword(String rawPassword, String encodedPassword) {
+        return passwordEncoder.matches(rawPassword, encodedPassword);
     }
 
     // Get user by ID

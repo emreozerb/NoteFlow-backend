@@ -24,7 +24,8 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString(exclude = { "categories", "password" })
+// @ToString(exclude = { "categories", "password" })
+@ToString(exclude = { "categories" })
 public class User {
 
     @Id
@@ -43,7 +44,7 @@ public class User {
 
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    // @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
     @NotBlank(message = "Full name is required")

@@ -1,5 +1,10 @@
 package com.noteflow.noteflow_backend.controller;
 
+import com.noteflow.noteflow_backend.dto.request.auth.LoginRequestDTO;
+import com.noteflow.noteflow_backend.dto.request.auth.RegisterRequestDTO;
+import com.noteflow.noteflow_backend.dto.response.UserDTO;
+import com.noteflow.noteflow_backend.dto.response.auth.AuthResponseDTO;
+import com.noteflow.noteflow_backend.mapper.UserMapper;
 import com.noteflow.noteflow_backend.model.User;
 import com.noteflow.noteflow_backend.security.JwtUtil;
 import com.noteflow.noteflow_backend.service.UserService;
@@ -23,17 +28,28 @@ public class UserController {
     private UserService userService;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private UserMapper userMapper;
 
     @Autowired
     private JwtUtil jwtUtil;
 
     // Register new user
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody User user) {
+    public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequestDTO request) {
         try {
+            if (userService.getUserByEmail(request.getEmail()).isPresent()) {
+                return ResponseEntity.badRequest().body("Error: Email is already registered");
+            }
+
+            if (userService.getUserByUsername(request.getUsername()).isPresent()) {
+                return ResponseEntity.badRequest().body("Error: Username is already taken");
+            }
+
+            User user = userMapper.toEntity(request);
             User createdUser = userService.createUser(user);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdUser);
+            UserDTO userDTO = userMapper.toDTO(createdUser);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(userDTO);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
@@ -41,20 +57,21 @@ public class UserController {
 
     // Login user - NOW RETURNS JWT TOKEN
     @PostMapping("/login")
-    public ResponseEntity<?> loginUser(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> loginUser(@Valid @RequestBody LoginRequestDTO request) {
         try {
-            Optional<User> userOptional = userService.getUserByEmail(loginRequest.getEmail());
+            Optional<User> userOptional = userService.getUserByEmail(request.getEmail());
 
             if (userOptional.isPresent()) {
                 User user = userOptional.get();
 
                 // Verify password
-                if (passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+                if (userService.validatePassword(request.getPassword(), user.getPassword())) {
                     // Generate JWT token
                     String token = jwtUtil.generateToken(user.getEmail(), user.getId());
 
-                    // Return token and user info
-                    LoginResponse response = new LoginResponse(token, user);
+                    // Return token and user info as DTO
+                    UserDTO userDTO = userMapper.toDTO(user);
+                    AuthResponseDTO response = new AuthResponseDTO(token, userDTO);
                     return ResponseEntity.ok(response);
                 } else {
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
@@ -80,7 +97,8 @@ public class UserController {
 
             Optional<User> user = userService.getUserById(id);
             if (user.isPresent()) {
-                return ResponseEntity.ok(user.get());
+                UserDTO userDTO = userMapper.toDTO(user.get());
+                return ResponseEntity.ok(userDTO);
             } else {
                 return ResponseEntity.notFound().build();
             }
@@ -91,59 +109,60 @@ public class UserController {
 
     // Get all users - ADMIN ONLY (for now, returns current user's info)
     @GetMapping
-    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
+    public ResponseEntity<?> getAllUser(Authentication authentication) {
         try {
-            User currentUser = (User) authentication.getPrincipal();
-            return ResponseEntity.ok(currentUser);
+            List<User> users = userService.getAllUsers();
+            List<UserDTO> usersDTO = userMapper.toDTOList(users);
+            return ResponseEntity.ok(usersDTO);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }
     }
 
-    // Update user profile - NOW REQUIRES AUTHENTICATION
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable Long id,
-            @Valid @RequestBody UserUpdateRequest request,
-            Authentication authentication) {
-        try {
-            User currentUser = (User) authentication.getPrincipal();
+    // // Update user profile - NOW REQUIRES AUTHENTICATION
+    // @PutMapping("/{id}")
+    // public ResponseEntity<?> updateUser(@PathVariable Long id,
+    // @Valid @RequestBody UserUpdateRequest request,
+    // Authentication authentication) {
+    // try {
+    // User currentUser = (User) authentication.getPrincipal();
 
-            // Users can only update their own profile
-            if (!currentUser.getId().equals(id)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
-            }
+    // // Users can only update their own profile
+    // if (!currentUser.getId().equals(id)) {
+    // return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+    // }
 
-            User updatedUser = new User();
-            updatedUser.setUsername(request.getUsername());
-            updatedUser.setEmail(request.getEmail());
-            updatedUser.setFullName(request.getFullName());
+    // User updatedUser = new User();
+    // updatedUser.setUsername(request.getUsername());
+    // updatedUser.setEmail(request.getEmail());
+    // updatedUser.setFullName(request.getFullName());
 
-            User user = userService.updateUser(id, updatedUser);
-            return ResponseEntity.ok(user);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
-    }
+    // User user = userService.updateUser(id, updatedUser);
+    // return ResponseEntity.ok(user);
+    // } catch (RuntimeException e) {
+    // return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+    // }
+    // }
 
-    // Update password - NOW REQUIRES AUTHENTICATION
-    @PutMapping("/{id}/password")
-    public ResponseEntity<?> updatePassword(@PathVariable Long id,
-            @RequestBody PasswordUpdateRequest request,
-            Authentication authentication) {
-        try {
-            User currentUser = (User) authentication.getPrincipal();
+    // // Update password - NOW REQUIRES AUTHENTICATION
+    // @PutMapping("/{id}/password")
+    // public ResponseEntity<?> updatePassword(@PathVariable Long id,
+    // @RequestBody PasswordUpdateRequest request,
+    // Authentication authentication) {
+    // try {
+    // User currentUser = (User) authentication.getPrincipal();
 
-            // Users can only update their own password
-            if (!currentUser.getId().equals(id)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
-            }
+    // // Users can only update their own password
+    // if (!currentUser.getId().equals(id)) {
+    // return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+    // }
 
-            userService.updatePassword(id, request.getNewPassword());
-            return ResponseEntity.ok("Password updated successfully");
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
-    }
+    // userService.updatePassword(id, request.getNewPassword());
+    // return ResponseEntity.ok("Password updated successfully");
+    // } catch (RuntimeException e) {
+    // return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+    // }
+    // }
 
     // Delete user - NOW REQUIRES AUTHENTICATION
     @DeleteMapping("/{id}")
